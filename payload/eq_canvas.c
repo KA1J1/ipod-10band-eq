@@ -9,6 +9,7 @@
 
 enum {
     CANVAS_TYPE = 0x63667763, /* cfwc */
+    NAME_CANVAS_TYPE = 0x6e616d65, /* name */
     VIEW_BYTES = 0xa4,
     VIEW_OPTIONS_BYTES = 0x5c,
     VIEW_VTABLE_BYTES = 0x104,
@@ -33,11 +34,13 @@ enum {
 enum {
     CANVAS_WIDTH = 320,
     CANVAS_HEIGHT = 217,
-    BAND_LEFT = 42,
-    BAND_WIDTH = 54,
+    BAND_LEFT = 40,
+    BAND_WIDTH = 27,
     BAND_TOP = 18,
     BAND_BOTTOM = 108,
     BAND_ZERO = (BAND_TOP + BAND_BOTTOM) / 2,
+    BAND_TRACK = 9,
+    BAND_HANDLE = 13,
     TYPE_TOP = 141,
     TYPE_HEIGHT = 27,
     PARAM_TOP = TYPE_TOP + TYPE_HEIGHT + 1,
@@ -72,6 +75,14 @@ static uint32_t canvas_index(int band, int parameter)
 static uint32_t canvas_wheel[0x34 / 4];
 static int canvas_wheel_initialized;
 static int canvas_active;
+static unsigned int name_cursor;
+
+/* Name editor hooks, implemented in custom_eq.c. */
+const char *cfw_eq_name_text(void);
+unsigned int cfw_eq_name_length(void);
+void cfw_eq_name_spin(unsigned int position, int delta);
+void cfw_eq_name_commit(void);
+void cfw_eq_name_begin(void);
 
 static void canvas_reset_wheel(void)
 {
@@ -353,27 +364,35 @@ static void canvas_response(void *context, const int32_t *bounds,
     }
 }
 
+/* Ten columns leave 27 pixels each, so band labels drop the unit: 20, 800, 2.5k. */
 static const char *canvas_frequency(int band, char text[12])
 {
     const char *label = canvas_value(band, PARAM_FREQUENCY);
-    unsigned int digits = 0;
+    unsigned int digits = 0, value = 0, n = 0;
     while (label[digits] >= '0' && label[digits] <= '9')
         digits++;
-    if (digits < 4)
-        return label;
-    unsigned int end = digits;
-    while (end > digits - 3 && label[end - 1] == '0')
-        end--;
-    unsigned int n = 0;
-    for (unsigned int i = 0; i < end; i++) {
-        if (i == digits - 3)
-            text[n++] = '.';
-        text[n++] = label[i];
+    for (unsigned int i = 0; i < digits; i++)
+        value = value * 10 + (unsigned int)(label[i] - '0');
+    if (digits < 4) {
+        for (unsigned int i = 0; i < digits; i++)
+            text[n++] = label[i];
+        text[n] = 0;
+        return text;
+    }
+    unsigned int remainder = value % 1000, thousands = value / 1000;
+    unsigned int fraction = (remainder + 50) / 100;
+    if (fraction == 10) {
+        thousands++;
+        remainder = 0;
+    }
+    if (thousands >= 10)
+        text[n++] = (char)('0' + thousands / 10);
+    text[n++] = (char)('0' + thousands % 10);
+    if (remainder && thousands < 10) {
+        text[n++] = '.';
+        text[n++] = (char)('0' + fraction);
     }
     text[n++] = 'k';
-    text[n++] = ' ';
-    text[n++] = 'H';
-    text[n++] = 'z';
     text[n] = 0;
     return text;
 }
@@ -406,15 +425,17 @@ static void canvas_bands(void *context, const int32_t *bounds,
         const unsigned char *color = colors[off        ? COLOR_BORDER
                                             : selected ? COLOR_ACCENT
                                                        : COLOR_INACTIVE];
-        canvas_rect(context, bounds, x - 8, BAND_TOP, 16, BAND_BOTTOM - BAND_TOP,
-                    colors[COLOR_TRACK]);
-        canvas_rect(context, bounds, x - 16, BAND_ZERO, 32, 1, colors[COLOR_ZERO]);
+        canvas_rect(context, bounds, x - BAND_TRACK / 2, BAND_TOP, BAND_TRACK,
+                    BAND_BOTTOM - BAND_TOP, colors[COLOR_TRACK]);
+        canvas_rect(context, bounds, x - BAND_HANDLE / 2, BAND_ZERO, BAND_HANDLE, 1,
+                    colors[COLOR_ZERO]);
         int top = y < BAND_ZERO ? y : BAND_ZERO;
         int height = y < BAND_ZERO ? BAND_ZERO - y : y - BAND_ZERO;
         if (height)
-            canvas_rect(context, bounds, x - 8, top, 16, height, color);
-        canvas_rect(context, bounds, x - 12, y - 3, 24, 6, color);
-        canvas_text(context, bounds, x - 25, TYPE_TOP - 25, 50, 22,
+            canvas_rect(context, bounds, x - BAND_TRACK / 2, top, BAND_TRACK, height,
+                        color);
+        canvas_rect(context, bounds, x - BAND_HANDLE / 2, y - 3, BAND_HANDLE, 6, color);
+        canvas_text(context, bounds, x - BAND_WIDTH / 2, TYPE_TOP - 25, BAND_WIDTH, 22,
                     off ? "Off" : canvas_frequency(band, frequency), 0,
                     colors[selected ? COLOR_ACCENT : COLOR_MUTED],
                     colors[selected ? COLOR_SELECTION : COLOR_BACKGROUND]);
@@ -471,6 +492,61 @@ static void canvas_parameters(void *context, const int32_t *bounds,
     }
 }
 
+static void canvas_name(void *context, const int32_t *bounds,
+                        const unsigned char colors[][4])
+{
+    enum { CELLS = 10, CELL_WIDTH = 28, CELL_HEIGHT = 46, CELL_TOP = 74 };
+    char cell[2] = {0, 0};
+    int left = (bounds[3] - bounds[1] - CELLS * CELL_WIDTH) / 2;
+    canvas_text(context, bounds, 0, 8, bounds[3] - bounds[1], 22, "Edit name", 1,
+                colors[COLOR_TEXT], colors[COLOR_BACKGROUND]);
+    unsigned int count = cfw_eq_name_length();
+    const char *name = cfw_eq_name_text();
+    for (unsigned int i = 0; i < CELLS; i++) {
+        if (i >= count)
+            break;
+        int x = left + (int)i * CELL_WIDTH;
+        cell[0] = name[i] ? name[i] : ' ';
+        canvas_text(context, bounds, x, CELL_TOP, CELL_WIDTH, CELL_HEIGHT, cell, 1,
+                    colors[COLOR_TEXT], colors[COLOR_BACKGROUND]);
+        if (i == name_cursor) {
+            canvas_rect(context, bounds, x, CELL_TOP - 2, CELL_WIDTH, 2,
+                        colors[COLOR_ACCENT]);
+            canvas_rect(context, bounds, x, CELL_TOP + CELL_HEIGHT, CELL_WIDTH, 2,
+                        colors[COLOR_ACCENT]);
+            canvas_rect(context, bounds, x, CELL_TOP - 2, 2, CELL_HEIGHT + 4,
+                        colors[COLOR_ACCENT]);
+            canvas_rect(context, bounds, x + CELL_WIDTH - 2, CELL_TOP - 2, 2,
+                        CELL_HEIGHT + 4, colors[COLOR_ACCENT]);
+        }
+    }
+    canvas_text(context, bounds, 0, 168, bounds[3] - bounds[1], 20,
+                "Wheel: letter   Center: next", 0, colors[COLOR_MUTED],
+                colors[COLOR_BACKGROUND]);
+    canvas_text(context, bounds, 0, 190, bounds[3] - bounds[1], 20,
+                "Menu: done and save", 0, colors[COLOR_MUTED],
+                colors[COLOR_BACKGROUND]);
+}
+
+static PATCH_ARM void canvas_name_draw(void *view, void *draw_argument,
+                                      const int32_t *clip)
+{
+    (void)draw_argument;
+    (void)clip;
+    uint32_t context[0x44 / 4];
+    int32_t bounds[4];
+    typedef void (*view_context_fn)(void *, void *);
+    typedef void (*rect_fn)(void *, int32_t *);
+    ((void *(*)(void *))OSOS_GRAPHICS_CONSTRUCT)(context);
+    ((view_context_fn)OSOS_VIEW_BIND_GRAPHICS)(view, context);
+    ((rect_fn)OSOS_VIEW_LOCAL_RECT)(view, bounds);
+    const unsigned char(*colors)[4] = canvas_palettes[!!cfw_dark_mode_enabled()];
+    canvas_rect(context, bounds, 0, 0, bounds[3] - bounds[1], bounds[2] - bounds[0],
+                colors[COLOR_BACKGROUND]);
+    canvas_load_fonts();
+    canvas_name(context, bounds, colors);
+}
+
 static PATCH_ARM void canvas_draw(void *view, void *draw_argument, const int32_t *clip)
 {
     (void)draw_argument;
@@ -504,6 +580,15 @@ static const uintptr_t canvas_vtable[(VIEW_VTABLE_PREFIX + VIEW_VTABLE_BYTES) / 
 PATCH_COPY(canvas_vtable, 0, OSOS_VIEW_VTABLE - VIEW_VTABLE_PREFIX,
            VIEW_VTABLE_PREFIX + VIEW_DRAW_SLOT);
 PATCH_COPY(canvas_vtable, VIEW_VTABLE_PREFIX + VIEW_DRAW_SLOT + 4,
+           OSOS_VIEW_VTABLE + VIEW_DRAW_SLOT + 4,
+           VIEW_VTABLE_BYTES - VIEW_DRAW_SLOT - 4);
+
+static const uintptr_t name_vtable[(VIEW_VTABLE_PREFIX + VIEW_VTABLE_BYTES) / 4] = {
+    [(VIEW_VTABLE_PREFIX + VIEW_DRAW_SLOT) / 4] = (uintptr_t)canvas_name_draw,
+};
+PATCH_COPY(name_vtable, 0, OSOS_VIEW_VTABLE - VIEW_VTABLE_PREFIX,
+           VIEW_VTABLE_PREFIX + VIEW_DRAW_SLOT);
+PATCH_COPY(name_vtable, VIEW_VTABLE_PREFIX + VIEW_DRAW_SLOT + 4,
            OSOS_VIEW_VTABLE + VIEW_DRAW_SLOT + 4,
            VIEW_VTABLE_BYTES - VIEW_DRAW_SLOT - 4);
 
@@ -550,6 +635,77 @@ PATCH_COPY(canvas_controller_vtable, 12 + 0x34, OSOS_CONTROLLER_SCREEN_VTABLE + 
 PATCH_COPY(canvas_controller_vtable, 12 + 0xf4, OSOS_CONTROLLER_SCREEN_VTABLE + 0xf4,
            0x128 - 0xf4);
 
+static PATCH_ARM void *name_view_create(void *owner, void *parent,
+                                        void *event_target, const void *descriptor)
+{
+    (void)owner;
+    uint32_t options[VIEW_OPTIONS_BYTES / 4];
+    typedef void (*options_fn)(const void *, void *);
+    typedef void *(*construct_fn)(void *, void *, void *, void *, const void *);
+    for (unsigned int i = 0; i < VIEW_OPTIONS_BYTES / 4; i++)
+        options[i] = 0;
+    ((options_fn)OSOS_VIEW_INIT_OPTIONS)(descriptor, options);
+    void *view = ((void *(*)(uint32_t))OSOS_CPP_NEW)(VIEW_BYTES);
+    view = ((construct_fn)OSOS_VIEW_CONSTRUCT)(view, 0, parent, event_target, options);
+    *(const uintptr_t **)view = name_vtable + VIEW_VTABLE_PREFIX / 4;
+    return view;
+}
+
+static PATCH_ARM int name_event(void *controller, void *event)
+{
+    const uint32_t *words = event;
+    if (words[1] == 0x15) {
+        osos_wheel_decode(event);
+        int delta = osos_wheel_accumulator_step(canvas_wheel, (int32_t)words[3], 0);
+        if (!delta)
+            return 1;
+        cfw_eq_name_spin(name_cursor, delta);
+        osos_ui_invalidate();
+        return 1;
+    }
+    if (words[1] == 0x0d && osos_button_ui_key(event) == 0x6f) {
+        name_cursor = (name_cursor + 1) % cfw_eq_name_length();
+        canvas_reset_wheel();
+        osos_ui_invalidate();
+        return 1;
+    }
+    return osos_controller_handle_event(controller, event);
+}
+
+static PATCH_ARM uint32_t name_activate(void *controller, uint32_t entering)
+{
+    name_cursor = 0;
+    cfw_eq_name_begin();
+    canvas_reset_wheel();
+    return osos_controller_activate(controller, entering);
+}
+
+static PATCH_ARM uint32_t name_deactivate(void *controller, uint32_t leaving)
+{
+    cfw_eq_name_commit();
+    return osos_controller_deactivate(controller, leaving);
+}
+
+static const uintptr_t name_controller_vtable[(12 + 0x128) / 4] = {
+    [(12 + 0x30) / 4] = (uintptr_t)name_event,
+    [(12 + 0xec) / 4] = (uintptr_t)name_activate,
+    [(12 + 0xf0) / 4] = (uintptr_t)name_deactivate,
+};
+PATCH_COPY(name_controller_vtable, 0, OSOS_CONTROLLER_SCREEN_VTABLE - 12, 12 + 0x30);
+PATCH_COPY(name_controller_vtable, 12 + 0x34, OSOS_CONTROLLER_SCREEN_VTABLE + 0x34,
+           0xec - 0x34);
+PATCH_COPY(name_controller_vtable, 12 + 0xf4, OSOS_CONTROLLER_SCREEN_VTABLE + 0xf4,
+           0x128 - 0xf4);
+
+static PATCH_ARM void *name_controller_create(const char *name, uint32_t screen,
+                                              uint32_t layout, uint32_t transition)
+{
+    canvas_reset();
+    void *controller = osos_controller_create_screen(name, screen, layout, transition);
+    *(const uintptr_t **)controller = name_controller_vtable + 3;
+    return controller;
+}
+
 static PATCH_ARM void *canvas_controller_create(const char *name, uint32_t screen,
                                                 uint32_t layout, uint32_t transition)
 {
@@ -565,4 +721,7 @@ void cfw_ui_register_canvas(void)
     ((register_fn)OSOS_REGISTER_VIEW_FACTORY)(CANVAS_TYPE, canvas_create);
     osos_ui_register_controllers(osos_controller_registry(), "CFWCanvas", 0,
                                  canvas_controller_create);
+    ((register_fn)OSOS_REGISTER_VIEW_FACTORY)(NAME_CANVAS_TYPE, name_view_create);
+    osos_ui_register_controllers(osos_controller_registry(), "CFWNameCanvas", 0,
+                                 name_controller_create);
 }

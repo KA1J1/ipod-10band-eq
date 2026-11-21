@@ -75,8 +75,11 @@ class DocumentCompiler:
         # Cover the status bar's final divider row. Bottom/right are independent extents.
         view[:0x30] = struct.pack("<12i", 0, 0, 0, 23, 0, 0, 217, 0, 6, 320, 0, 5)
         put(view, 0x30, resources.allocate())
-        put(view, 0x4C, 0x63667763)  # cfwc
-        resources.add("View", template, pack_blocks([(0x63667763, view)]))
+        # The name editor gets its own view type and controller class.
+        name_editor = "Name" in root.name
+        view_kind = 0x6E616D65 if name_editor else 0x63667763  # name / cfwc
+        put(view, 0x4C, view_kind)
+        resources.add("View", template, pack_blocks([(view_kind, view)]))
         resources.add(
             "TMLT", template, resources.stock("TMLT", "Settings_Brightness_Template")
         )
@@ -96,7 +99,7 @@ class DocumentCompiler:
                 if word(instance, 4) == template:
                     put(instance, 0x10, word(instance, 0x10) & ~0x00FF0000)
             resources.replace("SSin", instances_id, pack_blocks(instances))
-        resources.add("SCST", screen, b"CFWCanvas")
+        resources.add("SCST", screen, b"CFWNameCanvas" if name_editor else b"CFWCanvas")
         resources.set_events("CEVT", screen, struct.pack("<I", 0))
         layouts = blocks(resources.stock("SLst", "Settings_Brightness_Screen"))
         put(layouts[0][1], 0, layout)

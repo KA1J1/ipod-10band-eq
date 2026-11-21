@@ -10,6 +10,23 @@ static void notify(uint32_t property)
         osos_model_notify(model, OSOS_NOTIFY_ALL, property);
 }
 
+enum { CFW_UI_STRING_RESOLVERS = 4 };
+static const char *(*string_resolvers[CFW_UI_STRING_RESOLVERS])(uint32_t property);
+static const char *(*indexed_resolvers[CFW_UI_STRING_RESOLVERS])(uint32_t property,
+                                                                  uint32_t index);
+static uint32_t string_resolver_count;
+
+void cfw_ui_register_strings(const char *(*resolve)(uint32_t property),
+                             const char *(*resolve_indexed)(uint32_t property,
+                                                            uint32_t index))
+{
+    if (string_resolver_count < CFW_UI_STRING_RESOLVERS) {
+        string_resolvers[string_resolver_count] = resolve;
+        indexed_resolvers[string_resolver_count] = resolve_indexed;
+        string_resolver_count++;
+    }
+}
+
 void cfw_ui_refresh(const struct cfw_ui_field *field)
 {
     notify(field->property);
@@ -26,6 +43,16 @@ void cfw_ui_status(const struct cfw_ui_action *action, unsigned int status)
 
 int cfw_ui_property(uint32_t type, uint32_t property, uintptr_t *out)
 {
+    if (type == OSOS_PROPERTY_STRING) {
+        for (uint32_t i = 0; i < string_resolver_count; i++) {
+            const char *text = string_resolvers[i](property);
+            if (text) {
+                *out = (uintptr_t)text;
+                return 1;
+            }
+        }
+    }
+
     for (uint32_t i = 0; i < cfw_ui_action_count; i++) {
         const struct cfw_ui_action *action = cfw_ui_actions[i];
         if (property == action->property) {
@@ -88,6 +115,16 @@ int cfw_ui_property(uint32_t type, uint32_t property, uintptr_t *out)
 int cfw_ui_indexed_property(uint32_t type, uint32_t property, uint32_t index,
                             uintptr_t *out)
 {
+    if (type == OSOS_PROPERTY_STRING) {
+        for (uint32_t i = 0; i < string_resolver_count; i++) {
+            const char *text = indexed_resolvers[i](property, index);
+            if (text) {
+                *out = (uintptr_t)text;
+                return 1;
+            }
+        }
+    }
+
     for (uint32_t i = 0; i < cfw_ui_field_count; i++) {
         const struct cfw_ui_field *field = cfw_ui_fields[i];
         if (property != field->property || field->numeric || index >= field->count)

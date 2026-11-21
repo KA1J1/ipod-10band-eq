@@ -1,5 +1,19 @@
 # osos-lab
 
+> **Fork:** [ipod-10band-eq](https://github.com/KA1J1/ipod-10band-eq) extends
+> **RepriseOS 0.3.1** (osos-lab tag `v0.3.1`) with a ten-band Custom EQ, eight
+> named tune profiles and on-device profile renaming.
+>
+> Target firmware: Apple **2.0.5** for iPod classic **6G (80/160 GB)**,
+> **6.5G (120 GB)** and **7G (160 GB)**; tested on a 6.5G 120 GB. Not for iPod
+> 5G/5.5G, nano, shuffle, touch, iPhone or iPad.
+>
+> Before flashing, confirm the iPod uses the stock **16 KB clusters**; if not,
+> restore it with Apple Devices first. This repository builds only
+> `/osos-cfw.bin`; install the stock RepriseOS base with its own installer
+> first. See [FORK.md](FORK.md) for details and [NOTICE.md](NOTICE.md) for the
+> change list.
+
 RepriseOS adds features to Apple's original iPod firmware while retaining its
 familiar interface and playback system. This repository contains the patches,
 reverse engineering, and tools used to build and package it.

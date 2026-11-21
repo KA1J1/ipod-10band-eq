@@ -27,7 +27,7 @@ static unsigned text_draws;
 static int dark, text_font, pen_x, pen_y, draw_mode;
 static unsigned char draw_color[4];
 static unsigned char pixels[217][320][3];
-static const char *gain_labels[49], *frequency_labels[32], *q_labels[38];
+static const char *gain_labels[241], *frequency_labels[35], *q_labels[58];
 static uint32_t values[CFW_EQ_FIELDS];
 static unsigned changes, commits, snapshots, version;
 static int rejected, locked, example_response;
@@ -49,33 +49,19 @@ static const char *const type_labels[] = {"Off", "Peaking", "Low shelf", "High s
 static const char *const precut_labels[] = {"0.0 dB"};
 const struct cfw_ui_field cfw_eq_fields[CFW_EQ_FIELDS] = {
     FIELD(CFW_EQ_PRECUT, "Precut", precut_labels, 1),
-    FIELD(CFW_EQ_BAND1_TYPE, "Type", type_labels, 4),
-    FIELD(CFW_EQ_BAND1_GAIN, "Gain", gain_labels, 49),
-    FIELD(CFW_EQ_BAND1_FREQUENCY, "Frequency", frequency_labels, 32),
-    FIELD(CFW_EQ_BAND1_Q, "Q", q_labels, 38),
-    FIELD(CFW_EQ_BAND2_TYPE, "Type", type_labels, 4),
-    FIELD(CFW_EQ_BAND2_GAIN, "Gain", gain_labels, 49),
-    FIELD(CFW_EQ_BAND2_FREQUENCY, "Frequency", frequency_labels, 32),
-    FIELD(CFW_EQ_BAND2_Q, "Q", q_labels, 38),
-    FIELD(CFW_EQ_BAND3_TYPE, "Type", type_labels, 4),
-    FIELD(CFW_EQ_BAND3_GAIN, "Gain", gain_labels, 49),
-    FIELD(CFW_EQ_BAND3_FREQUENCY, "Frequency", frequency_labels, 32),
-    FIELD(CFW_EQ_BAND3_Q, "Q", q_labels, 38),
-    FIELD(CFW_EQ_BAND4_TYPE, "Type", type_labels, 4),
-    FIELD(CFW_EQ_BAND4_GAIN, "Gain", gain_labels, 49),
-    FIELD(CFW_EQ_BAND4_FREQUENCY, "Frequency", frequency_labels, 32),
-    FIELD(CFW_EQ_BAND4_Q, "Q", q_labels, 38),
-    FIELD(CFW_EQ_BAND5_TYPE, "Type", type_labels, 4),
-    FIELD(CFW_EQ_BAND5_GAIN, "Gain", gain_labels, 49),
-    FIELD(CFW_EQ_BAND5_FREQUENCY, "Frequency", frequency_labels, 32),
-    FIELD(CFW_EQ_BAND5_Q, "Q", q_labels, 38),
+#define BAND(index)                                                                    \
+    FIELD(CFW_EQ_BAND1_TYPE + (index)*4, "Type", type_labels, 4),                      \
+        FIELD(CFW_EQ_BAND1_GAIN + (index)*4, "Gain", gain_labels, 241),                \
+        FIELD(CFW_EQ_BAND1_FREQUENCY + (index)*4, "Frequency", frequency_labels, 35),  \
+        FIELD(CFW_EQ_BAND1_Q + (index)*4, "Q", q_labels, 58)
+    BAND(0), BAND(1), BAND(2), BAND(3), BAND(4), BAND(5), BAND(6), BAND(7), BAND(8),
+    BAND(9),
+#undef BAND
 };
 #undef FIELD
-const int32_t cfw_eq_gain[49] = {-120, -115, -110, -105, -100, -95, -90, -85, -80, -75,
-                                 -70,  -65,  -60,  -55,  -50,  -45, -40, -35, -30, -25,
-                                 -20,  -15,  -10,  -5,   0,    5,   10,  15,  20,  25,
-                                 30,   35,   40,   45,   50,   55,  60,  65,  70,  75,
-                                 80,   85,   90,   95,   100,  105, 110, 115, 120};
+/* The generated table is -120..120 by one-tenth steps; only the reachable ends and
+ * the centre matter for the pixel assertions. */
+const int32_t cfw_eq_gain[241] = {[0] = -120, [120] = 0, [240] = 120};
 
 static void change_value(uint32_t field, uint32_t value)
 {
@@ -178,6 +164,31 @@ static void osos_graphics_fill_rect_unmapped(void *context, const int32_t *rect)
         for (int x = rect[1]; x < rect[3]; x++)
             memcpy(pixels[y][x], draw_color, 3);
     rectangles++;
+}
+
+/* The canvas now also hosts the name editor; the EQ canvas test never opens it. */
+const char *cfw_eq_name_text(void)
+{
+    return "TEST NAME";
+}
+
+unsigned int cfw_eq_name_length(void)
+{
+    return 10;
+}
+
+void cfw_eq_name_spin(unsigned int position, int delta)
+{
+    (void)position;
+    (void)delta;
+}
+
+void cfw_eq_name_commit(void)
+{
+}
+
+void cfw_eq_name_begin(void)
+{
 }
 
 int cfw_dark_mode_enabled(void)
@@ -373,26 +384,33 @@ static void wheel(int delta)
 
 int main(void)
 {
-    for (int i = 0; i < 49; i++)
+    for (int i = 0; i < 241; i++)
         gain_labels[i] = "+12.0 dB";
-    for (int i = 0; i < 32; i++)
+    for (int i = 0; i < 35; i++)
         frequency_labels[i] = "20000 Hz";
-    for (int i = 0; i < 38; i++)
+    for (int i = 0; i < 58; i++)
         q_labels[i] = "4.0";
     for (int i = 0; i < CFW_EQ_BANDS; i++) {
-        values[CFW_EQ_BAND1_GAIN + i * 4] = 24;
+        values[CFW_EQ_BAND1_GAIN + i * 4] = 120;
         values[CFW_EQ_BAND1_Q + i * 4] = 4;
     }
+    frequency_labels[6] = "800 Hz";
     frequency_labels[18] = "1000 Hz";
     frequency_labels[19] = "1250 Hz";
-    frequency_labels[29] = "12500 Hz";
+    frequency_labels[26] = "5600 Hz";
+    frequency_labels[32] = "12500 Hz";
     char compact[12];
+    values[CFW_EQ_BAND5_FREQUENCY] = 6;
+    assert(!strcmp(canvas_frequency(4, compact), "800"));
     values[CFW_EQ_BAND5_FREQUENCY] = 18;
-    assert(!strcmp(canvas_frequency(4, compact), "1k Hz"));
+    assert(!strcmp(canvas_frequency(4, compact), "1k"));
     values[CFW_EQ_BAND5_FREQUENCY] = 19;
-    assert(!strcmp(canvas_frequency(4, compact), "1.25k Hz"));
-    values[CFW_EQ_BAND5_FREQUENCY] = 29;
-    assert(!strcmp(canvas_frequency(4, compact), "12.5k Hz"));
+    assert(!strcmp(canvas_frequency(4, compact), "1.3k"));
+    values[CFW_EQ_BAND5_FREQUENCY] = 26;
+    assert(!strcmp(canvas_frequency(4, compact), "5.6k"));
+    values[CFW_EQ_BAND5_FREQUENCY] = 32;
+    assert(!strcmp(canvas_frequency(4, compact), "12k"));
+    values[CFW_EQ_BAND5_FREQUENCY] = 4;
     canvas_reset();
     assert(editor.mode == MODE_BAND && editor.band == 0);
     wheel(0);

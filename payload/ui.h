@@ -51,6 +51,11 @@ extern const uint32_t cfw_ui_action_count;
 
 void cfw_ui_refresh(const struct cfw_ui_field *field);
 void cfw_ui_status(const struct cfw_ui_action *action, unsigned int status);
+/* A feature can own menu value text: the resolvers see a property id (and, for
+ * list rows, an index) and return a string, or 0 when it is not their own. */
+void cfw_ui_register_strings(const char *(*resolve)(uint32_t property),
+                             const char *(*resolve_indexed)(uint32_t property,
+                                                            uint32_t index));
 int cfw_ui_property(uint32_t type, uint32_t property, uintptr_t *out);
 int cfw_ui_indexed_property(uint32_t type, uint32_t property, uint32_t index,
                             uintptr_t *out);

@@ -34,7 +34,7 @@ int cfw_eq_coefficients(int32_t out[5], unsigned int type, unsigned int hz,
                         unsigned int precut_tenths_db, unsigned int rate)
 {
     if (type > CFW_EQ_HIGH_SHELF || hz < 20 || hz > 20000 || q_tenths < 3 ||
-        q_tenths > 40 || gain_tenths_db < -120 || gain_tenths_db > 120 ||
+        q_tenths > 60 || gain_tenths_db < -120 || gain_tenths_db > 120 ||
         precut_tenths_db > 100 || (rate != 44100 && rate != 48000))
         return 0;
 

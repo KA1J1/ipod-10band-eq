@@ -121,10 +121,12 @@ class UiTests(unittest.TestCase):
         document = parser.read(root / "payload/custom_eq.ui")
         resources.allocate("CFW_EQ_Icon")
         compiled = compile_document(resources, document)
-        self.assertEqual(len(compiled.fields), 21)
+        # 41 tune fields plus the Profile selector.
+        self.assertEqual(len(compiled.fields), 42)
+        self.assertEqual(len(document.values["cfw_eq_profile_names"].labels), 8)
         self.assertEqual(
             sum(len(document.values[item.choices].labels) for item in document.fields),
-            716,
+            3489,
         )
         rows = [
             row
@@ -132,7 +134,7 @@ class UiTests(unittest.TestCase):
             if kind == "ITEM" and (kind, resource_id) not in resources.original
             for _, row in blocks(data)
         ]
-        self.assertEqual(len(rows), 38)
+        self.assertEqual(len(rows), 76)
         for item in document.fields:
             field = compiled.fields[item.slot]
             if document.values[item.choices].numeric:
@@ -183,14 +185,19 @@ class UiTests(unittest.TestCase):
                 events = resources.added["CEVT", field.screen]
                 self.assertEqual(word(events, 0), 1)
                 self.assertIn(item.name.encode(), events.data)
-        self.assertEqual(sum(kind == "View" for kind, _ in resources.added), 2)
+        self.assertEqual(sum(kind == "View" for kind, _ in resources.added), 3)
         self.assertEqual(sum(kind == "SEVT" for kind, _ in resources.added), 2)
         self.assertNotIn(
             b"CFW_EQ_Set_", b"".join(data.data for data in resources.added.values())
         )
-        self.assertEqual(document.root.items[1].kind, "canvas")
-        self.assertEqual(document.root.items[1].title, "Graphic EQ")
-        self.assertTrue(document.actions[0].hide_when_zero)
+        self.assertEqual(document.root.items[0].kind, "selector")
+        self.assertEqual(document.root.items[0].name, "CFW_EQ_Profile")
+        self.assertEqual(document.root.items[1].name, "CFW_EQNameCanvas")
+        self.assertEqual(document.root.items[3].kind, "canvas")
+        self.assertEqual(document.root.items[3].title, "Graphic EQ")
+        self.assertEqual([action.name for action in document.actions], ["CFW_EQ_Save"])
+        self.assertTrue(document.actions[-1].hide_when_zero)
+        self.assertFalse(any(action.hide_when_zero for action in document.actions[:-1]))
         self.assertEqual(len(resources.menu_items), 1)
         save = compiled.actions["CFW_EQ_Save"]
         save_row = next(row for row in rows if word(row, 0x30) == save.item)
@@ -213,6 +220,9 @@ class UiTests(unittest.TestCase):
         self.assertEqual(
             document.values["cfw_eq_precut_values"].numbers, list(range(0, -101, -1))
         )
+        # 0 = idle, 1 = write failure, 2 = rejected filter; all three must have text.
+        self.assertEqual(len(document.values["cfw_eq_save_status"].labels), 3)
+        self.assertTrue(all(document.values["cfw_eq_save_status"].labels))
 
     def test_layout_reuses_unchanged_instance_resources(self):
         resources = Resources(

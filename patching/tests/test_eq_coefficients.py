@@ -15,7 +15,7 @@ from pathlib import Path
 class EqCoefficientsTests(unittest.TestCase):
     def test_tenth_db_precut_and_filter_response(self):
         root = Path(__file__).resolve().parents[2]
-        with tempfile.TemporaryDirectory() as directory:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as directory:
             library = Path(directory) / "eq.so"
             subprocess.run(
                 [
@@ -72,11 +72,22 @@ class EqCoefficientsTests(unittest.TestCase):
             ]
             response.restype = ctypes.c_int
             for rate in (44100, 48000):
-                for q in (3, 7, 40):
+                for q in (3, 7, 40, 52, 60):
                     for gain in (-120, 0, 120):
-                        bank = ((ctypes.c_int32 * 5) * 5)()
+                        bank = ((ctypes.c_int32 * 5) * 10)()
                         for band, (kind, hz) in enumerate(
-                            ((2, 80), (1, 1000), (3, 16000), (1, 250), (1, 4000))
+                            (
+                                (2, 80),
+                                (1, 1000),
+                                (3, 16000),
+                                (1, 250),
+                                (1, 4000),
+                                (1, 120),
+                                (1, 5600),
+                                (1, 705),
+                                (1, 2500),
+                                (1, 10000),
+                            )
                         ):
                             self.assertEqual(
                                 fn(
@@ -107,6 +118,18 @@ class EqCoefficientsTests(unittest.TestCase):
                             self.assertAlmostEqual(
                                 response(bank, hz, rate), expected, delta=0.51
                             )
+            # The ten-band Q range reaches 6.0, enough for AutoEQ's 5.18 notch.
+            for q in (52, 60):
+                bank = ((ctypes.c_int32 * 5) * 10)()
+                self.assertEqual(fn(bank[0], 1, 1000, q, 88, 0, 44100), 1)
+                # The remaining bands must be identity, or the product is zero.
+                for band in range(1, 10):
+                    self.assertEqual(fn(bank[band], 0, 1000, 7, 0, 0, 44100), 1)
+                self.assertAlmostEqual(response(bank, 1000, 44100), 88, delta=0.51)
+            # One step past the 6.0 limit is rejected.
+            out = (ctypes.c_int32 * 5)()
+            self.assertEqual(fn(out, 1, 1000, 61, 60, 0, 44100), 0)
+            self.assertEqual(fn(out, 1, 1000, 60, 60, 0, 44100), 1)
 
     @staticmethod
     def reference(kind, hz, gain, precut, rate):

@@ -21,3 +21,5 @@ __pycache__/
 .DS_Store
 /ghidra/project/
 *.bytes
+# Backups written by tools/cfweq/install_10band.ps1
+backup/

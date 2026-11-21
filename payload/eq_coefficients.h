@@ -4,7 +4,9 @@
 #define CFW_EQ_COEFFICIENTS_H
 #include <stdint.h>
 
-enum { CFW_EQ_BANDS = 5 };
+enum { CFW_EQ_BANDS = 10 };
+/* One precut plus type, frequency, Q and gain per band. */
+#define CFW_EQ_TUNE_FIELDS (1 + CFW_EQ_BANDS * 4)
 
 enum cfw_eq_type { CFW_EQ_OFF, CFW_EQ_PEAKING, CFW_EQ_LOW_SHELF, CFW_EQ_HIGH_SHELF };
 

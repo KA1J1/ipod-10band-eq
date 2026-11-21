@@ -10,9 +10,13 @@
 #include "native/eq-layout.h"
 
 const int32_t cfw_eq_types[4] = {0, 1, 2, 3};
-const int32_t cfw_eq_frequencies[32] = {20, 60, 160, 1000, 4000, 8000};
-const int32_t cfw_eq_q[38] = {7, 12, 19};
-const int32_t cfw_eq_gain[49] = {0, 50, -50, 75, 70, -5};
+const int32_t cfw_eq_frequencies[35] = {20,   25,   31,   40,   50,  60,  70,
+                                        80,   100,  125,  160,  200, 250, 315,
+                                        400,  500,  630,  800,  1000, 1250, 1600,
+                                        2000, 2500, 3150, 4000, 5000, 5600, 6300,
+                                        7100, 8000, 9000, 10000, 12500, 16000, 20000};
+const int32_t cfw_eq_q[58] = {3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
+const int32_t cfw_eq_gain[241] = {0, 50, -50, 75, 70, -5};
 const int32_t cfw_eq_precut_values[101] = {0, -65};
 static unsigned loads, resets, stock_processes, stage_calls[CFW_EQ_BANDS];
 static unsigned irq_depth;
@@ -206,7 +210,7 @@ int main(void)
     assert(resets == 3);
     for (unsigned i = OSOS_EQ_STATE_BYTES / 4; i < sizeof(native) / 4; i++)
         assert(native[i] == 0xdeadbeef);
-    puts("EQ audio: five-stage processing, migration parity, crossfade and reset "
+    puts("EQ audio: ten-stage processing, migration parity, crossfade and reset "
          "passed");
     return 0;
 }

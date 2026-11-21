@@ -11,7 +11,9 @@ enum {
     FADE_CHUNK_FRAMES = 32,
 };
 
-_Static_assert(CFW_EQ_FIELDS == 1 + CFW_EQ_BANDS * 4, "EQ field layout");
+_Static_assert(CFW_EQ_TUNE_FIELDS == 1 + CFW_EQ_BANDS * 4, "EQ field layout");
+_Static_assert(CFW_EQ_PRECUT == 0, "precut is the first field");
+_Static_assert(CFW_EQ_BAND10_GAIN == CFW_EQ_TUNE_FIELDS - 1, "ten bands of four fields");
 
 static int32_t published[2][CFW_EQ_BANDS][5];
 static volatile uint32_t generation;
