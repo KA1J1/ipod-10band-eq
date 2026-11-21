@@ -34,9 +34,41 @@ CURRENT_VERSION = 6  # eight named slots; older files import into slot 1
 TYPES = ("Off", "Peaking", "Low shelf", "High shelf")
 
 V4_FREQUENCIES = (
-    20, 25, 31, 40, 50, 60, 70, 80, 100, 125, 160, 200, 250, 315, 400, 500, 630, 800,
-    1000, 1250, 1600, 2000, 2500, 3150, 4000, 5000, 5600, 6300, 7100, 8000, 9000,
-    10000, 12500, 16000, 20000,
+    20,
+    25,
+    31,
+    40,
+    50,
+    60,
+    70,
+    80,
+    100,
+    125,
+    160,
+    200,
+    250,
+    315,
+    400,
+    500,
+    630,
+    800,
+    1000,
+    1250,
+    1600,
+    2000,
+    2500,
+    3150,
+    4000,
+    5000,
+    5600,
+    6300,
+    7100,
+    8000,
+    9000,
+    10000,
+    12500,
+    16000,
+    20000,
 )
 V4_Q = tuple(range(3, 61))
 V4_GAIN = tuple(range(-120, 121))
@@ -47,14 +79,44 @@ V5_SLOTS = 8  # tune slots the firmware file holds
 V6_NAME_BYTES = 24  # bytes per slot name in a version 6 file
 
 V3_FREQUENCIES = (
-    20, 25, 31, 40, 50, 60, 70, 80, 100, 125, 160, 200, 250, 315, 400, 500, 630, 800,
-    1000, 1250, 1600, 2000, 2500, 3150, 4000, 5000, 6300, 8000, 10000, 12500, 16000,
+    20,
+    25,
+    31,
+    40,
+    50,
+    60,
+    70,
+    80,
+    100,
+    125,
+    160,
+    200,
+    250,
+    315,
+    400,
+    500,
+    630,
+    800,
+    1000,
+    1250,
+    1600,
+    2000,
+    2500,
+    3150,
+    4000,
+    5000,
+    6300,
+    8000,
+    10000,
+    12500,
+    16000,
     20000,
 )
 V3_Q = tuple(range(3, 41))
 V3_GAIN = tuple(range(-120, 121, 5))
 V3_PRECUT = V4_PRECUT
 V3_FIELDS = 21
+
 
 def fnv1a(data):
     value = 2166136261
@@ -68,9 +130,7 @@ def nearest(values, target):
 
 
 def pack(values, version):
-    body = struct.pack("<II", MAGIC, version) + struct.pack(
-        f"<{len(values)}I", *values
-    )
+    body = struct.pack("<II", MAGIC, version) + struct.pack(f"<{len(values)}I", *values)
     return body + struct.pack("<I", fnv1a(body))
 
 
@@ -102,9 +162,7 @@ def slot_signature(values):
         kind, hz, q, gain = values[1 + band * 4 : 5 + band * 4]
         if kind == 0 or gain == V4_GAIN.index(0):
             continue
-        parts.append(
-            f"{TYPES[kind][:2]}{V4_FREQUENCIES[hz]}:{V4_GAIN[gain] / 10:+.1f}"
-        )
+        parts.append(f"{TYPES[kind][:2]}{V4_FREQUENCIES[hz]}:{V4_GAIN[gain] / 10:+.1f}")
     return " ".join(parts)
 
 
@@ -128,7 +186,9 @@ def read_slots(path):
             )
         expected = 16 + V5_SLOTS * V6_NAME_BYTES + V5_SLOTS * V4_FIELDS * 4 + 4
         if len(data) != expected:
-            raise ValueError(f"{path}: version 6 needs {expected} bytes, got {len(data)}")
+            raise ValueError(
+                f"{path}: version 6 needs {expected} bytes, got {len(data)}"
+            )
         if struct.unpack("<I", data[-4:])[0] != fnv1a(data[:-4]):
             raise ValueError(f"{path}: checksum mismatch")
         if active >= count:
@@ -143,13 +203,17 @@ def read_slots(path):
             names.append(raw[:end].decode("utf-8", "replace"))
         base = 16 + V5_SLOTS * V6_NAME_BYTES
         slots = [
-            list(struct.unpack_from(f"<{V4_FIELDS}I", data, base + slot * V4_FIELDS * 4))
+            list(
+                struct.unpack_from(f"<{V4_FIELDS}I", data, base + slot * V4_FIELDS * 4)
+            )
             for slot in range(V5_SLOTS)
         ]
         for slot in slots:
             for index, value in enumerate(slot):
                 if value >= V4_COUNTS[index]:
-                    raise ValueError(f"{path}: slot value out of range at field {index}")
+                    raise ValueError(
+                        f"{path}: slot value out of range at field {index}"
+                    )
         return version, slots, active, names, data
     if version == 5:
         _, _, count, active = struct.unpack("<IIII", data[:16])
@@ -159,7 +223,9 @@ def read_slots(path):
             )
         expected = 16 + V5_SLOTS * V4_FIELDS * 4 + 4
         if len(data) != expected:
-            raise ValueError(f"{path}: version 5 needs {expected} bytes, got {len(data)}")
+            raise ValueError(
+                f"{path}: version 5 needs {expected} bytes, got {len(data)}"
+            )
         if struct.unpack("<I", data[-4:])[0] != fnv1a(data[:-4]):
             raise ValueError(f"{path}: checksum mismatch")
         if active >= count:
@@ -171,7 +237,9 @@ def read_slots(path):
         for slot in slots:
             for index, value in enumerate(slot):
                 if value >= V4_COUNTS[index]:
-                    raise ValueError(f"{path}: slot value out of range at field {index}")
+                    raise ValueError(
+                        f"{path}: slot value out of range at field {index}"
+                    )
         return version, slots, active, [f"Slot {i + 1}" for i in range(V5_SLOTS)], data
     sizes = {1: 13, 2: 13, 3: 21, 4: 41}
     if version not in sizes:
@@ -179,7 +247,9 @@ def read_slots(path):
     fields = sizes[version]
     expected = 8 + fields * 4 + 4
     if len(data) != expected:
-        raise ValueError(f"{path}: version {version} needs {expected} bytes, got {len(data)}")
+        raise ValueError(
+            f"{path}: version {version} needs {expected} bytes, got {len(data)}"
+        )
     stored = struct.unpack("<I", data[-4:])[0]
     if stored != fnv1a(data[:-4]):
         raise ValueError(f"{path}: checksum mismatch (stored {stored:#010x})")
@@ -336,15 +406,21 @@ def main():
     verify = sub.add_parser("verify", help="check magic, version and checksum")
     verify.add_argument("path")
     verify.add_argument("--hex", action="store_true", help="print the bytes")
-    verify.add_argument("--slots", action="store_true", help="list every version 5 slot")
+    verify.add_argument(
+        "--slots", action="store_true", help="list every version 5 slot"
+    )
     verify.set_defaults(run=command_verify)
 
-    migrate = sub.add_parser("migrate", help="convert an older file to the current version")
+    migrate = sub.add_parser(
+        "migrate", help="convert an older file to the current version"
+    )
     migrate.add_argument("source")
     migrate.add_argument("out", nargs="?")
     migrate.set_defaults(run=command_migrate)
 
-    defaults = sub.add_parser("defaults", help="write eight empty slots with default names")
+    defaults = sub.add_parser(
+        "defaults", help="write eight empty slots with default names"
+    )
     defaults.add_argument("out", nargs="?")
     defaults.set_defaults(run=command_defaults)
 

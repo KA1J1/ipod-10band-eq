@@ -9,15 +9,13 @@ Hold-mode canvas draws (the canvas samples the same function at 261 points).
 """
 
 import argparse
-import cmath
 import math
 
 import matplotlib
 
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-
 import cfweq_tool as tool
+import matplotlib.pyplot as plt
 
 SCALE = 1 << 24
 
@@ -156,7 +154,9 @@ def main():
     margin = max(3.0, (high - low) * 0.15)
     axes.set_ylim(low - margin, high + margin)
     axes.set_xticks([20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000])
-    axes.set_xticklabels(["20", "50", "100", "200", "500", "1k", "2k", "5k", "10k", "20k"])
+    axes.set_xticklabels(
+        ["20", "50", "100", "200", "500", "1k", "2k", "5k", "10k", "20k"]
+    )
     axes.grid(True, which="both", alpha=0.3)
     axes.set_xlabel("frequency (Hz)")
     axes.set_ylabel("gain (dB)")

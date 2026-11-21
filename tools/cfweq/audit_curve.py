@@ -31,8 +31,9 @@ def main():
     precut = -tool.V4_PRECUT[converted[0]]
     grid = [20 * 1000 ** (i / POINTS) for i in range(POINTS + 1)]
 
-    print(f"{args.path}: version {version}, precut {-precut / 10:+.1f} dB, "
-          f"{args.rate} Hz")
+    print(
+        f"{args.path}: version {version}, precut {-precut / 10:+.1f} dB, {args.rate} Hz"
+    )
 
     cumulative = [0.0] * len(grid)
     worst_prefix = None
@@ -50,14 +51,18 @@ def main():
         peak = max(cumulative)
         where = grid[cumulative.index(peak)]
         flag = "" if peak <= 0.0 else "  <-- above 0 dBFS"
-        print(f"  band {band + 1:>2} {tool.TYPES[kind]:<10} {hz:>6} Hz "
-              f"{gain / 10:>+5.1f} dB Q {q / 10:>4.1f}   cumulative max "
-              f"{peak:>+6.2f} dB at {where:>6.0f} Hz{flag}")
+        print(
+            f"  band {band + 1:>2} {tool.TYPES[kind]:<10} {hz:>6} Hz "
+            f"{gain / 10:>+5.1f} dB Q {q / 10:>4.1f}   cumulative max "
+            f"{peak:>+6.2f} dB at {where:>6.0f} Hz{flag}"
+        )
         if worst_prefix is None or peak > worst_prefix:
             worst_prefix, worst_where = peak, where
 
-    print(f"  worst cumulative peak {worst_prefix:+.2f} dB at {worst_where:.0f} Hz"
-          f" ({'safe' if worst_prefix <= 0 else 'CLIPS'})")
+    print(
+        f"  worst cumulative peak {worst_prefix:+.2f} dB at {worst_where:.0f} Hz"
+        f" ({'safe' if worst_prefix <= 0 else 'CLIPS'})"
+    )
     return 0 if worst_prefix <= 0 else 1
 
 

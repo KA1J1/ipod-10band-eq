@@ -22,7 +22,10 @@ class RecipeError(Exception):
 
 
 def fingerprint(data, label):
-    if len(data) != label["bytes"] or hashlib.sha256(data).hexdigest() != label["sha256"]:
+    if (
+        len(data) != label["bytes"]
+        or hashlib.sha256(data).hexdigest() != label["sha256"]
+    ):
         raise RecipeError(f"fingerprint mismatch: {label}")
 
 
@@ -46,7 +49,9 @@ def verify_checks(recipe, inputs):
         offset = check["offset"]
         expected = bytes.fromhex(check["hex"])
         if data[offset : offset + len(expected)] != expected:
-            raise RecipeError(f"preimage check failed at {offset:#x} in {check['name']}")
+            raise RecipeError(
+                f"preimage check failed at {offset:#x} in {check['name']}"
+            )
 
 
 def assemble(recipe, data, inputs):
@@ -85,9 +90,10 @@ def main():
         if recipe.get("schema") != 2:
             raise RecipeError(f"unsupported recipe schema: {recipe.get('schema')}")
         data = args.data.read_bytes()
-        if len(data) != recipe["data"]["bytes"] or hashlib.sha256(
-            data
-        ).hexdigest() != recipe["data"]["sha256"]:
+        if (
+            len(data) != recipe["data"]["bytes"]
+            or hashlib.sha256(data).hexdigest() != recipe["data"]["sha256"]
+        ):
             raise RecipeError("compiled data does not match the recipe")
         inputs = load_inputs(args.inputs, recipe["inputs"])
         image = assemble(recipe, data, inputs)

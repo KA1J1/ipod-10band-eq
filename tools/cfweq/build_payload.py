@@ -35,8 +35,9 @@ def main():
 
     sys.path.insert(0, str(repo))
     sys.path.insert(0, str(repo / "tools"))
-    import firmware  # noqa: E402  (tools/firmware.py)
     import version  # noqa: E402  (tools/version.py)
+
+    import firmware  # noqa: E402  (tools/firmware.py)
     from patching.recipes.osos import build_recipe  # noqa: E402
 
     info = version.identity(repo)
