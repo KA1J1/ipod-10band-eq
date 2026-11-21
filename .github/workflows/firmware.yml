@@ -5,7 +5,6 @@ on:
   pull_request:
   push:
     branches: [main]
-    tags: ['v*']
   workflow_dispatch:
 
 permissions:
@@ -91,49 +90,3 @@ jobs:
           path: build/releases/
           if-no-files-found: error
 
-  draft-release:
-    if: startsWith(github.ref, 'refs/tags/v') && github.event_name == 'push'
-    needs: build
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    environment: firmware-release
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: firmware
-          path: build/releases
-      - name: Sign and verify
-        env:
-          SIGNING_SEED: ${{ secrets.REPRISE_BUNDLE_SIGNING_SEED }}
-          PUBLIC_KEY: ${{ vars.REPRISE_BUNDLE_PUBLIC_KEY }}
-          RELEASE_TAG: ${{ github.ref_name }}
-        run: |
-          test -n "$SIGNING_SEED"
-          test -n "$PUBLIC_KEY"
-          umask 077
-          seed_file=$(mktemp)
-          key_file=$(mktemp)
-          trap 'rm -f "$seed_file" "$key_file"' EXIT
-          printf '%s' "$SIGNING_SEED" > "$seed_file"
-          printf '%s' "$PUBLIC_KEY" > "$key_file"
-          unset SIGNING_SEED
-          chmod +x build/releases/reprise
-          python3 tools/release_assets.py --directory build/releases --out build/release-assets \
-            --reprise build/releases/reprise --seed "$seed_file" --key "$key_file" \
-            --version "${RELEASE_TAG#v}"
-      - name: Create draft
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.ref_name }}
-        run: |
-          release_args=()
-          if [[ "$RELEASE_TAG" == *-* ]]; then
-            release_args+=(--prerelease)
-          fi
-          gh release create "$RELEASE_TAG" build/release-assets/* --verify-tag --draft \
-            --title "RepriseOS $RELEASE_TAG" --generate-notes "${release_args[@]}"
